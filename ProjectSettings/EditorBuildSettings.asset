@@ -47,7 +47,7 @@ EditorBuildSettings:
   - enabled: 0
     path: Assets/Scenes/Camera/CpuImages/CpuImages.unity
     guid: e769916924fd3814ab1d9474de816b22
-  - enabled: 1
+  - enabled: 0
     path: Assets/Scenes/Occlusion/DepthImages/DepthImages.unity
     guid: ed5207d50697d40d688249cd6c59608b
   - enabled: 0
@@ -176,6 +176,9 @@ EditorBuildSettings:
   - enabled: 0
     path: Assets/Scenes/BoundingBoxDetection/BoundingBoxes.unity
     guid: e5d8c18ab0c954fd4a7aee48dffe9836
+  - enabled: 1
+    path: Assets/Scenes/Occlusion/DepthImages/Depth Images (Mod).unity
+    guid: 67297b4f38bcb4f5d89fecc22971ca7c
   m_configObjects:
     Unity.XR.WindowsMR.Settings: {fileID: 11400000, guid: c52d3bb36b4c86f47af54ab9c7a02589,
       type: 2}

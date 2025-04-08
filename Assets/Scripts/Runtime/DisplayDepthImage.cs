@@ -1,4 +1,6 @@
+using System.IO;
 using System.Text;
+using TMPro;
 using UnityEngine.UI;
 using UnityEngine.XR.ARFoundation;
 using UnityEngine.XR.ARSubsystems;
@@ -78,6 +80,77 @@ namespace UnityEngine.XR.ARFoundation.Samples
         /// </summary>
         Matrix4x4 k_AndroidFlipYMatrix = Matrix4x4.identity;
 #endif // UNITY_ANDROID
+        
+        public float aquisitionFPS
+        {
+            get => m_aquisitionFPS;
+            set => m_aquisitionFPS = value;
+        }
+
+        [SerializeField]
+        [Tooltip("The amount of frames per second that will be stored.")]
+        float m_aquisitionFPS = 1f;
+
+        public TMP_Text aquisitionFPSText
+        {
+            get => aquisitionFPSText;
+            set => m_aquisitionFPSText = value;
+        }
+        [SerializeField]
+        [Tooltip("TMP_Text of Aquisition FPS slide handle.")]
+        TMP_Text m_aquisitionFPSText;
+
+        public float elapsedTime
+        {
+            get => m_elapsedTime;
+            set => m_elapsedTime = value;
+        }
+
+        [SerializeField]
+        [Tooltip("The elapsed time variable to control the aquisition fps.")]
+        float m_elapsedTime;   
+
+        public float fpsSliderValue
+        {
+            get => m_fpsSlider.value;
+            set => m_fpsSlider.value = value;
+        }
+
+        [SerializeField]
+        [Tooltip("The value of Aquisition FPS slider.")]
+        Slider m_fpsSlider;
+
+        public bool isRecording
+        {
+            get => m_isRecording;
+            set => m_isRecording = value;
+        }
+
+        [SerializeField]
+        [Tooltip("Boolean var to check is the system is currently recording.")]
+        bool m_isRecording;
+
+        public TMP_InputField idInputField
+        {
+            get => m_idInputField;
+            set => m_idInputField = value;
+        }
+
+        [SerializeField]
+        [Tooltip("TMP_InputField for ID (patiente/filename).")]
+        TMP_InputField m_idInputField;
+
+        public RenderTexture RGB_RenderTexture
+        {
+            get => m_RGB_RenderTexture;
+            set => m_RGB_RenderTexture = value;
+        }
+
+        [SerializeField]
+        [Tooltip("Texture of current RGB image.")]
+        RenderTexture m_RGB_RenderTexture;
+
+
 
         /// <summary>
         /// Get or set the <c>AROcclusionManager</c>.
@@ -179,10 +252,10 @@ namespace UnityEngine.XR.ARFoundation.Samples
 
         void Awake()
         {
-#if UNITY_ANDROID
-            k_AndroidFlipYMatrix[1,1] = -1.0f;
-            k_AndroidFlipYMatrix[2,1] = 1.0f;
-#endif // UNITY_ANDROID
+            #if UNITY_ANDROID
+                        k_AndroidFlipYMatrix[1,1] = -1.0f;
+                        k_AndroidFlipYMatrix[2,1] = 1.0f;
+            #endif // UNITY_ANDROID
         }
 
         void OnEnable()
@@ -203,6 +276,19 @@ namespace UnityEngine.XR.ARFoundation.Samples
             m_DisplayRotationMatrix = Matrix4x4.identity;
             if (m_CameraManager != null)
                 m_CameraManager.frameReceived -= OnCameraFrameEventReceived;
+        }
+
+        public void UpdateFPS()
+        {
+            // Update the FPS value based on the slider value:  2 | 4 | 8 | 16
+            m_aquisitionFPS = Mathf.Pow(2.0f,m_fpsSlider.value);
+            m_aquisitionFPSText.text = m_aquisitionFPS.ToString();
+        }
+
+        public void UpdateIsRecording()
+        {
+            // Update the recording state based on the toggle value
+            m_isRecording = !m_isRecording;
         }
 
         void Update()
@@ -271,7 +357,7 @@ namespace UnityEngine.XR.ARFoundation.Samples
 
                     return;
                 }
-            }
+            } // Switch
 
             // Get all of the occlusion textures.
             Texture2D humanStencil = m_OcclusionManager.humanStencilTexture;
@@ -288,6 +374,7 @@ namespace UnityEngine.XR.ARFoundation.Samples
 
             // Decide which to display based on the current mode.
             Texture2D displayTexture;
+
             switch (m_DisplayMode)
             {
                 case DisplayMode.HumanStencil:
@@ -307,6 +394,83 @@ namespace UnityEngine.XR.ARFoundation.Samples
             Debug.Assert(m_RawImage != null, "no raw image");
             m_RawImage.texture = displayTexture;
 
+
+
+            if (isRecording){
+                
+                // Increment elapsed time by the time passed since the last frame
+                elapsedTime += Time.deltaTime;
+
+                // Check if a second has passed
+                if (elapsedTime >= 1f/m_aquisitionFPS){
+                                       
+                    elapsedTime = 0f; // Reset elapsed time
+                    //Debug.Log("Reseted @: " + Time.deltaTime);
+
+                    try
+                    {
+                        CreateReadableTexture(displayTexture); // Create a readable texture from the display texture
+
+                        if (readableTexture.EncodeToPNG() == null)
+                        {
+                            Debug.LogError("displayTexture texture could not be encoded to PNG");
+                        }else
+                        {
+                            byte[] bytes = readableTexture.EncodeToPNG();
+                            //string fileName = m_idInputField.text + "_"+ System.DateTime.Now.ToString("HH-mm-ss-fff");
+                            //string path = Path.Combine(Application.persistentDataPath, fileName + ".png");
+                            
+                            string folderName = m_idInputField.text;
+                            string fileName = folderName + " " + System.DateTime.Now.ToString("HH-mm-ss-fff") + ".png";
+
+                            // Cria o caminho completo para a nova pasta
+                            string folderPath = Path.Combine(Application.persistentDataPath, folderName);
+
+                            // Verifica se a pasta existe e cria caso não exista
+                            if (!Directory.Exists(folderPath))
+                            {
+                                Directory.CreateDirectory(folderPath);
+                            }
+
+                            // Combina o caminho da pasta com o nome do arquivo
+                            string fullPath = Path.Combine(folderPath, fileName);
+                            
+                            File.WriteAllBytes(fullPath, bytes);
+
+                            //RGB
+
+                            // Cria uma nova Texture2D com as dimensões da RenderTexture
+                            Texture2D texture = new Texture2D(m_RGB_RenderTexture.width, m_RGB_RenderTexture.height, TextureFormat.RGBA32, false);
+
+                            // Lê os pixels da RenderTexture para a Texture2D
+                            texture.ReadPixels(new Rect(0, 0, m_RGB_RenderTexture.width, m_RGB_RenderTexture.height), 0, 0);
+                            texture.Apply();
+
+                            byte[] bytesRGB = texture.EncodeToPNG();
+
+                            if (bytesRGB == null)
+                            {
+                                Debug.LogError("displayTexture texture could not be encoded to PNG");
+                            }
+
+                            fileName = folderName + " " + System.DateTime.Now.ToString("HH-mm-ss-fff") + "_RGB.png";
+
+                            fullPath = Path.Combine(folderPath, fileName);
+
+                            File.WriteAllBytes(fullPath, bytesRGB);
+
+                        }
+
+
+                    }catch (System.Exception e)
+                    {
+                        Debug.LogError("displayTexture texture could not be converted to readable texture: " + e);
+                    }
+                }   //if x time has passed
+            } // if (isRecording)
+            
+
+
             // Get the aspect ratio for the current texture.
             float textureAspectRatio = (displayTexture == null) ? 1.0f : ((float)displayTexture.width / (float)displayTexture.height);
 
@@ -320,6 +484,33 @@ namespace UnityEngine.XR.ARFoundation.Samples
                 UpdateRawImage();
             }
         }
+
+        public Texture2D readableTexture;       // The readable texture to be created from the display texture
+        public RenderTexture tempRT;            // The temporary render texture used to create the readable texture
+
+
+        void CreateReadableTexture(Texture2D source)
+        {
+            tempRT = RenderTexture.GetTemporary(source.width, source.height);
+            Graphics.Blit(source, tempRT);
+
+            RenderTexture previous = RenderTexture.active;
+            RenderTexture.active = tempRT;
+
+            if (readableTexture == null)
+            {
+                readableTexture = new Texture2D(source.width, source.height, source.format, false);
+            }
+            
+            readableTexture.ReadPixels(new Rect(0, 0, source.width, source.height), 0, 0);
+            readableTexture.Apply();
+
+            RenderTexture.active = previous;
+            RenderTexture.ReleaseTemporary(tempRT);
+
+            //return readableTexture;
+        }
+
 
         /// <summary>
         /// When the camera frame event is raised, capture the display rotation matrix.
@@ -409,19 +600,22 @@ namespace UnityEngine.XR.ARFoundation.Samples
             {
                 (minDimension, maxDimension) = (maxDimension, minDimension);
             }
-            Vector2 rectSize;
-            switch (m_CurrentScreenOrientation)
-            {
-                case ScreenOrientation.LandscapeRight:
-                case ScreenOrientation.LandscapeLeft:
-                    rectSize = new Vector2(maxDimension, minDimension);
-                    break;
-                case ScreenOrientation.PortraitUpsideDown:
-                case ScreenOrientation.Portrait:
-                default:
-                    rectSize = new Vector2(minDimension, maxDimension);
-                    break;
-            }
+            Vector2 rectSize = new Vector2(minDimension, maxDimension);
+
+            
+
+            // switch (m_CurrentScreenOrientation)
+            // {
+            //     case ScreenOrientation.LandscapeRight:
+            //     case ScreenOrientation.LandscapeLeft:
+            //         rectSize = new Vector2(maxDimension, minDimension);
+            //         break;
+            //     case ScreenOrientation.PortraitUpsideDown:
+            //     case ScreenOrientation.Portrait:
+            //     default:
+            //         rectSize = new Vector2(minDimension, maxDimension);
+            //         break;
+            // }
 
             // Determine the raw image material and maxDistance material parameter based on the display mode.
             float maxDistance;
@@ -445,7 +639,15 @@ namespace UnityEngine.XR.ARFoundation.Samples
             }
 
             // Update the raw image dimensions and the raw image material parameters.
-            m_RawImage.rectTransform.sizeDelta = rectSize;
+            
+            // Adjust the image dimensions so the bg fits the parent canvas
+            m_RawImage.rectTransform.anchorMin = new Vector2(0, 0);
+            m_RawImage.rectTransform.anchorMax = new Vector2(1, 1);
+            m_RawImage.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+            m_RawImage.rectTransform.offsetMin = Vector2.zero;          // Remove deslocamento da borda inferior/esquerda  
+            m_RawImage.rectTransform.offsetMax = Vector2.zero;          // Remove deslocamento da borda superior/direita  
+
+
             material.SetFloat(k_MaxDistanceId, maxDistance);
             material.SetMatrix(k_DisplayRotationPerFrameId, m_DisplayRotationMatrix);
             m_RawImage.material = material;
@@ -462,6 +664,13 @@ namespace UnityEngine.XR.ARFoundation.Samples
 
             // Update the raw image following the mode change.
             UpdateRawImage();
+        }
+
+
+        public void Start()
+        {
+            UpdateFPS();
+            isRecording = false;
         }
     }
 }
